@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QueryCanvas — SQL Workspace</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="nav-rail" aria-label="Primary navigation">
+      <a class="brand-mark" href="/" aria-label="QueryCanvas home"><span>q</span></a>
+      <nav class="rail-actions">
+        <button class="rail-button active" type="button" aria-label="Query workspace" title="Query workspace">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"></rect><path d="M8 8h8M8 12h5M8 16h8"></path></svg>
+        </button>
+        <button class="rail-button" type="button" id="railImport" aria-label="Import data" title="Import data">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"></path><path d="M5 16v4h14v-4"></path></svg>
+        </button>
+        <button class="rail-button" type="button" id="railSaved" aria-label="Saved queries" title="Saved queries">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16l-6-4-6 4z"></path></svg>
+        </button>
+      </nav>
+      <div class="rail-bottom"><span class="rail-user">QC</span></div>
+    </aside>
+
+    <aside class="explorer-pane">
+      <div class="explorer-heading">
+        <div>
+          <div class="overline">WORKSPACE</div>
+          <h1>Explorer</h1>
+        </div>
+        <button class="icon-button" id="refreshDatasets" type="button" title="Refresh datasets" aria-label="Refresh datasets">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"></path><path d="M6.2 9a6.5 6.5 0 0 1 10.7-2L20 12M4 12l3.1 5a6.5 6.5 0 0 0 10.7-2"></path></svg>
+        </button>
+      </div>
+      <div class="explorer-section">
+        <div class="section-label"><span>DATA SOURCES</span><span class="count-pill" id="datasetCount">{{ datasets|length }}</span></div>
+        <div id="datasetList" class="dataset-list"></div>
+        <button class="add-source-button" id="addSource" type="button"><span>+</span> Import CSV dataset</button>
+      </div>
+      <div class="explorer-section saved-section" id="savedSection">
+        <div class="section-label"><span>SAVED QUERIES</span><span class="count-pill" id="savedCount">{{ saved_queries|length }}</span></div>
+        <div id="savedQueryList" class="saved-query-list"></div>
+        <div class="saved-empty" id="savedEmpty">Save useful queries to keep them close.</div>
+      </div>
+      <div class="explorer-footer"><span class="status-dot"></span><span>Local workspace</span><span class="footer-lock">Private</span></div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div class="breadcrumbs"><span>Workspace</span><span class="crumb-slash">/</span><strong>Query editor</strong></div>
+        <div class="topbar-actions">
+          <span class="connection-label"><span class="status-dot"></span> SQLite connected</span>
+          <button class="button button-secondary" id="importCsv" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 16v4h14v-4"></path></svg> Import data</button>
+        </div>
+      </header>
+
+      <div class="page-heading">
+        <div>
+          <div class="eyebrow"><span class="eyebrow-mark"></span> DATA WORKBENCH</div>
+          <h2>Explore your data.</h2>
+          <p>Write a query, inspect the result, and keep useful discoveries.</p>
+        </div>
+        <div class="active-dataset-chip" id="activeDatasetChip">
+          <span class="table-chip-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="7" ry="3"></ellipse><path d="M5 5v14c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"></path></svg></span>
+          <span><small>ACTIVE DATASET</small><strong id="activeDatasetName">{{ selected.name if selected else 'No dataset' }}</strong></span>
+          <span class="chip-chevron">⌄</span>
+        </div>
+      </div>
+
+      <div class="workbench-grid">
+        <section class="editor-column" aria-label="SQL editor and query results">
+          <section class="panel editor-panel">
+            <div class="panel-topline">
+              <div class="panel-title-group"><span class="panel-icon sql-icon">SQL</span><div><h3>Query editor</h3><p>SQLite · read-only mode</p></div></div>
+              <div class="editor-actions"><button class="text-button" id="formatQuery" type="button">Format</button><button class="text-button" id="clearQuery" type="button">Clear</button></div>
+            </div>
+            <div class="code-editor-wrap">
+              <div class="line-numbers" id="lineNumbers" aria-hidden="true">1<br>2<br>3<br>4<br>5<br>6</div>
+              <textarea id="sqlInput" class="sql-input" aria-label="SQL query" spellcheck="false" autocapitalize="off" autocomplete="off">SELECT
+    region,
+    SUM(revenue) AS total_revenue,
+    COUNT(*) AS order_count
+FROM {{ selected.table_name if selected else 'orders_sample' }}
+GROUP BY region
+ORDER BY total_revenue DESC;</textarea>
+            </div>
+            <div class="editor-bottomline">
+              <div class="editor-meta"><span class="language-dot"></span><span>SQL</span><span class="meta-divider">·</span><span>Ctrl + Enter to run</span></div>
+              <button class="button button-primary" id="runQuery" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7z"></path></svg><span>Run query</span><kbd>⌘ ↵</kbd></button>
+            </div>
+            <div class="inline-message" id="queryMessage" role="status" aria-live="polite"></div>
+          </section>
+
+          <section class="panel results-panel">
+            <div class="results-header">
+              <div class="results-tabs"><button class="result-tab active" type="button">Results</button><button class="result-tab" type="button" id="schemaTab">Schema</button></div>
+              <div class="results-tools"><span id="resultSummary">Run a query to see results</span><button class="icon-text-button" id="exportCsv" type="button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 16v4h14v-4"></path></svg> Export CSV</button></div>
+            </div>
+            <div class="table-wrap" id="resultTableWrap">
+              <div class="empty-results"><div class="empty-results-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 10h16M4 15h10M4 20h16"></path><path d="M8 3v4M16 3v4"></path></svg></div><strong>Your results will appear here</strong><span>Run the sample query or write your own SQL above.</span></div>
+            </div>
+            <div class="results-foot"><span id="resultFootNote">Results are read-only and limited to 200 rows.</span><span id="resultDuration"></span></div>
+          </section>
+        </section>
+
+        <aside class="assistant-column" aria-label="AI query assistant and schema">
+          <section class="copilot-panel">
+            <div class="copilot-heading"><div class="copilot-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 14 9l6 3-6 2-2 7-2-7-6-2 6-3z"></path></svg></div><div><h3>Query copilot</h3><p>Ask in plain English</p></div><span class="beta-pill">AI</span></div>
+            <p class="copilot-intro">Describe what you want to find. I'll draft a SQL query against your selected dataset.</p>
+            <label class="sr-only" for="naturalQuestion">Describe the data question</label>
+            <textarea id="naturalQuestion" class="question-input" placeholder="Which region has the highest revenue?" rows="4"></textarea>
+            <button class="button button-copilot" id="generateSql" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 14 9l6 3-6 2-2 7-2-7-6-2 6-3z"></path></svg> Generate SQL <span>↗</span></button>
+            <div id="aiMessage" class="ai-message" role="status" aria-live="polite">{% if gemini_ready %}Gemini is configured for this workspace.{% else %}AI generation is optional. Add a Gemini key in .env to enable it.{% endif %}</div>
+            <div class="suggestion-area"><div class="mini-label">TRY ASKING</div><button class="suggestion" type="button" data-question="Show total revenue by region, highest first">Total revenue by region <span>↗</span></button><button class="suggestion" type="button" data-question="Which products sold the most units?">Best-selling products <span>↗</span></button><button class="suggestion" type="button" data-question="Show the 5 highest revenue orders">Top 5 orders by revenue <span>↗</span></button></div>
+          </section>
+
+          <section class="schema-panel">
+            <div class="schema-heading"><div><div class="mini-label">SELECTED DATA</div><h3>Schema</h3></div><span id="schemaColumnCount" class="count-pill">{{ selected.columns|length if selected else 0 }} fields</span></div>
+            <div class="schema-table-name"><span class="table-name-icon">▦</span><span id="schemaTableName">{{ selected.table_name if selected else '' }}</span><span class="row-count-badge" id="schemaRowCount">{{ selected.row_count if selected else 0 }} rows</span></div>
+            <div class="schema-columns" id="schemaColumns"></div>
+          </section>
+          <div class="assistant-note"><span class="note-icon">i</span><p>Queries run locally against SQLite. QueryCanvas only permits read-only queries and never executes uploaded code.</p></div>
+        </aside>
+      </div>
+      <footer class="statusbar"><div><span class="status-dot"></span> Ready <span class="status-separator">/</span> QueryCanvas Community</div><div><span>Local SQLite</span><span class="status-separator">·</span><span>Max 200 rows per result</span></div></footer>
+    </main>
+  </div>
+
+  <input type="file" id="csvFileInput" accept=".csv,text/csv" hidden>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script>
+    window.QUERYCANVAS_INITIAL = {
+      datasets: {{ datasets|tojson }},
+      selectedId: {{ (selected.id if selected else '')|tojson }},
+      savedQueries: {{ saved_queries|tojson }},
+      geminiReady: {{ gemini_ready|tojson }}
+    };
+  </script>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
